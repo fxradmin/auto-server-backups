@@ -9,6 +9,10 @@ import requests
 
 # Define the function to send email
 def zip_files():
+	needed_directory = '/home/fxrracing/public_html/shopifyexports'
+	#print("old directory",os.getcwd())
+	os.chdir(needed_directory)
+	#print("new directoory",os.getcwd())
 	current_dir = os.getcwd()
 	all_files = os.listdir(current_dir)
 	zip_file_name = "ServerBackup"+ '.zip'
@@ -48,12 +52,9 @@ def upload_file(zip_file_name):
 		return r.status_code
 
 def main():
-
-
 	# Get the email address and password
 	#email = input('Enter your email address: ')
 	#password = input('Enter your email password: ')
-
 	zip_file_name = zip_files()
 	#status_code = upload_file(zip_file_name)
 	#print(status_code)
@@ -61,7 +62,9 @@ def main():
 	# Remove the zip file
 	print(zip_file_name)
 	#os.remove(zip_file_name)
+
 	print('Done and file removed!')
+
 
 
 #Call the main function
