@@ -6,6 +6,8 @@ import datetime
 import sys
 from dotenv import load_dotenv
 import zipfile
+import random
+from retrying import retry
 
 load_dotenv('.env')
 APP_ID = os.getenv('APP_ID')
@@ -15,11 +17,11 @@ TOKEN_ENDPOINT =f'https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/toke
 MS_GRAPH_SCOPE = os.getenv('MS_GRAPH_SCOPE')
 userID = os.getenv('userID')
 folderID= os.getenv('folderID')
-filePath='/Users/derekfodekerodgers/Projects/auto-server-backups/wawoo'
+filePath='/home/fxrracing/public_html/shopifyexports'
 fileName= os.path.basename(filePath) #this will c
 
-#needed_directory = '/home/fxrracing/public_html/shopifyexports'
-needed_directory = '/Users/derekfodekerodgers/Projects/auto-server-backups/wawoo'
+#needed_directory = ''
+needed_directory = '/home/fxrracing/public_html/shopifyexports'
 def format_needed_files(needed_files):
     needed_files = str(needed_files)
     needed_files = needed_files.replace("[","")
@@ -58,7 +60,7 @@ def zip_files():
 			needed_files.append(file)
 			excel_file_path = os.path.join(current_dir, file)
 			zip_file.write(excel_file_path, file)
-			os.remove(file)
+			#os.remove(file)
 
 			zip_info = zip_file.getinfo(file)
 			file_size = zip_info.compress_size
@@ -113,10 +115,11 @@ def request_upload_url(token_response, fileName):
 	print(json.dumps(response.text))
 	return response
 
-
+@retry(wait_random_min=1000, wait_random_max=2000)
 def upload_request(response, filePath):
 	print('upload request would have happened here')
 	upload_url=response.json()['uploadUrl']
+
 	with open(filePath, 'rb') as f:
 			total_file_size = os.path.getsize(filePath)
 			chunk_size = 2560000 # 2.5MB
@@ -125,22 +128,35 @@ def upload_request(response, filePath):
 			chunk_number = total_file_size//chunk_size
 			chunk_leftover = total_file_size - chunk_size * chunk_number
 			i = 0
+
 			while True:
-				chunk_data = f.read(chunk_size)
-				start_index = i*chunk_size
-				end_index = start_index + chunk_size
+				try:
+					chunk_data = f.read(chunk_size)
+					start_index = i*chunk_size
+					end_index = start_index + chunk_size
 				#If end of file, break
-				if not chunk_data:
-					break
-				if i == chunk_number:
-					end_index = start_index + chunk_leftover
+					if not chunk_data:
+						break
+					if i == chunk_number:
+						end_index = start_index + chunk_leftover
 				#Setting the header with the appropriate chunk data location in the file
-				headers = {'Content-Length':'{}'.format(chunk_size),'Content-Range':'bytes {}-{}/{}'.format(start_index, end_index-1, total_file_size)}
+					headers = {'Content-Length':'{}'.format(chunk_size),'Content-Range':'bytes {}-{}/{}'.format(start_index, end_index-1, total_file_size)}
 				#Upload one chunk at a time
-				chunk_data_upload = requests.put(upload_url, data=chunk_data, headers=headers)
-				print(chunk_data_upload)
-				print(chunk_data_upload.json())
-				i = i + 1
+					chunk_data_upload = requests.put(upload_url, data=chunk_data, headers=headers)
+					print(chunk_data_upload)
+					print(chunk_data_upload.json())
+					i = i + 1
+				except Exception as e:
+					print("error",e)
+					with open('errorlog.txt', 'a') as f:
+						f.write('error:',e)
+						f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+						f.write(fileName)
+						f.write('\n')
+				finally:
+					continue
+
+
 
 
 
@@ -204,20 +220,47 @@ def main():
 	file_names = zip_files()
 	print(file_names)
 	for fileName in file_names:
-		filePath = os.path.join('/Users/derekfodekerodgers/Projects/auto-server-backups/wawoo', fileName)
+		filePath = os.path.join('/home/fxrracing/public_html/shopifyexports', fileName)
 		if token_exists():
-			token_response = get_token_from_cache()
-			token_response = check_token_expiration(token_response)  # Update this line
-			upload_url_response = request_upload_url(token_response, fileName)
-			upload_request(upload_url_response, filePath)
-			print(fileName)
-			os.remove(fileName)
+			try:
+				token_response = get_token_from_cache()
+				token_response = check_token_expiration(token_response)  # Update this line
+				upload_url_response = request_upload_url(token_response, fileName)
+				upload_request(upload_url_response, filePath)
+				print(fileName)
+				os.remove(fileName)
+			except Exception as e:
+				print("error",e)
+				#write to log file
+				with open('errorlog.txt', 'a') as f:
+					f.write('error:',e)
+					f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+					f.write(fileName)
+					f.write('\n')
+				pass
+			finally:
+				#retry the process if it fails
+				continue
+
+
 		else:
-			token_response = get_access_token()
-			upload_url_response = request_upload_url(token_response, fileName)
-			upload_request(upload_url_response, filePath)
-			print(fileName)
-			os.remove(fileName)
+			try:
+				token_response = get_access_token()
+				upload_url_response = request_upload_url(token_response, fileName)
+				upload_request(upload_url_response, filePath)
+				print(fileName)
+				os.remove(fileName)
+
+			except Exception as e:
+				print("error",e)
+				#write to log file
+				with open('log.txt', 'a') as f:
+					f.write('error:',e)
+					f.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+					f.write(fileName)
+					f.write('\n')
+				pass
+
 if __name__ == '__main__':
 	main()
 	if (os.path.exists('token.json')):
