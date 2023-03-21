@@ -5,9 +5,12 @@ __pycache__/
 
 # C extensions
 *.so
-
+/wawoo
+/venv
 # Distribution / packaging
 .Python
+.env
+.dccache
 build/
 develop-eggs/
 dist/
@@ -129,6 +132,6 @@ dmypy.json
 .pyre/
 
 
-#secret stuff	
+#secret stuff
 .env
 token.json

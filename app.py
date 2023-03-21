@@ -7,7 +7,7 @@ import sys
 from dotenv import load_dotenv
 import zipfile
 
-load_dotenv('.env') 
+load_dotenv('.env')
 APP_ID = os.getenv('APP_ID')
 APP_SECERET = os.getenv('APP_SECERET')
 TENANT_ID = os.getenv('TENANT_ID')
@@ -15,11 +15,11 @@ TOKEN_ENDPOINT =f'https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/toke
 MS_GRAPH_SCOPE = os.getenv('MS_GRAPH_SCOPE')
 userID = os.getenv('userID')
 folderID= os.getenv('folderID')
-filePath='C:/Users/dfodekerodgers01/Documents/automation-testing/'
+filePath='/Users/derekfodekerodgers/Projects/auto-server-backups/wawoo'
 fileName= os.path.basename(filePath) #this will c
 
 #needed_directory = '/home/fxrracing/public_html/shopifyexports'
-
+needed_directory = '/Users/derekfodekerodgers/Projects/auto-server-backups/wawoo'
 def format_needed_files(needed_files):
     needed_files = str(needed_files)
     needed_files = needed_files.replace("[","")
@@ -34,13 +34,13 @@ def zip_files():
 	print("zip files accessed")
 	# Define the directory path where your Excel files are located
 	print("old directory",os.getcwd())
-	#os.chdir(needed_directory)
-	#print (os.getcwd())
+	os.chdir(needed_directory)
+	print (os.getcwd())
 	current_dir = os.getcwd()
 	# Create a list of all the Excel files in the directory
 	all_files = os.listdir(current_dir)
 	# Initialize variables for tracking the total size of the zip file
-	print("all files",all_files)
+	#print("all files",all_files)
 	total_size = 0
 	max_size = 1024 * 1024 * 640 # 300 MB
 	zip_file_index = 1
@@ -50,6 +50,7 @@ def zip_files():
 	file_path = os.path.join(current_dir, zip_file_name)
 	files_to_upload = []
 	needed_files = []
+
 	for file in all_files:
 		date_created = datetime.datetime.fromtimestamp(os.path.getmtime(file))
 		if file.endswith(".xlsx") :
@@ -57,35 +58,36 @@ def zip_files():
 			needed_files.append(file)
 			excel_file_path = os.path.join(current_dir, file)
 			zip_file.write(excel_file_path, file)
-			#os.remove(file)
-			print("file",file)
+			os.remove(file)
+
 			zip_info = zip_file.getinfo(file)
 			file_size = zip_info.compress_size
 			total_size += file_size
-			
+
 			if total_size >= max_size:
 				try:
-					
+					with zip_file.open('log_file.txt', 'w') as log_file:
+						log_file.write(f"Backup created on {datetime.datetime.now()}\n".encode())
+						log_file.write(f"Backup contains the following files: {format_needed_files(needed_files)} ".encode())
 					zip_file.close()
 					print("total size",total_size)
 					zip_file_index += 1
 					zip_file_name = f"fileBackup_{zipMonth}_{zip_file_index}.zip"
 					zip_file = zipfile.ZipFile(zip_file_name, "w")
 					total_size = 0
-					
+
 				except Exception as e:
 					print("error",e)
 					pass
 				finally:
 					print("finally")
 					#print("log data",needed_files)
+					files_to_upload.append(zip_file_name)
 					pass
-			
-	with zip_file.open('log_file.txt', 'w') as log_file:
-						log_file.write(f"Backup created on {datetime.datetime.now()}\n".encode())
-						log_file.write(f"Backup contains the following files: {format_needed_files(needed_files)} ".encode())
+
+
 	zip_file.close()		#print(needed_files)
-	files_to_upload.append(zip_file_name)
+
 	#print("files to upload",files_to_upload)
 	return files_to_upload
 
@@ -202,20 +204,23 @@ def main():
 	file_names = zip_files()
 	print(file_names)
 	for fileName in file_names:
-		filePath = os.path.join('C:/Users/dfodekerodgers01/Documents/automation-testing/', fileName)
+		filePath = os.path.join('/Users/derekfodekerodgers/Projects/auto-server-backups/wawoo', fileName)
 		if token_exists():
 			token_response = get_token_from_cache()
 			token_response = check_token_expiration(token_response)  # Update this line
 			upload_url_response = request_upload_url(token_response, fileName)
 			upload_request(upload_url_response, filePath)
+			print(fileName)
+			os.remove(fileName)
 		else:
 			token_response = get_access_token()
 			upload_url_response = request_upload_url(token_response, fileName)
 			upload_request(upload_url_response, filePath)
-	
+			print(fileName)
+			os.remove(fileName)
 if __name__ == '__main__':
 	main()
 	if (os.path.exists('token.json')):
 		os.remove('token.json')
 	sys.exit()
-	
+
